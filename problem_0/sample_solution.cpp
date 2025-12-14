@@ -2,7 +2,9 @@
 #include <vector>
 #include <cstdint>
 #include <algorithm>
-
+#include <thread>
+#include <cmath>
+#include <mutex>
 
 std::istream& operator>>(std::istream& in, __int128& value) {
     std::string s;
@@ -42,6 +44,16 @@ std::ostream& operator<<(std::ostream& out, __int128 value) {
     return out;
 }
 
+void Factorize (__int128 N, __int128 left, __int128 right, std::vector <__int128> &own_candidates) {
+    for (__int128 i = left; i < right && i <= N / i; i += 2) {
+        if (N % i == 0)
+            own_candidates.push_back(i);
+
+        while (N % i == 0)
+            N /= i;
+    }
+}
+
 int main() {
     __int128 n;
     std::cin >> n;
@@ -50,15 +62,42 @@ int main() {
     }
 
     std::vector<__int128> factors;
-    for (__int128 p = 2; p <= n / p; ++p) {
-        while (n % p == 0) {
-            factors.push_back(p);
-            n /= p;
+    while (n % 2 == 0) {
+        factors.push_back(2);
+        n /= 2;
+    }
+
+    int CNT_THREADS = 24;
+    std::vector <std::vector <__int128> > factors_threads(CNT_THREADS);
+    std::vector <std::thread> threads;
+    std::vector <__int128> candidates;
+
+    __int128 range = sqrt(n) / CNT_THREADS;
+    if (range == 0) range = 2;
+
+    __int128 start = 3;
+
+    for (int i = 0; i < CNT_THREADS; ++ i ) {
+        threads.emplace_back(std::thread(Factorize, n, start, start + range, std::ref(factors_threads[i])));
+        start = start + range + (range % 2);
+    }
+
+    for (auto &t : threads)
+        t.join();
+
+    for (int i = 0; i < CNT_THREADS; ++ i ) {
+        for (auto c : factors_threads[i]) {
+            if (c > n / c) break;
+
+            while (n % c == 0) {
+                n /= c;
+                factors.push_back(c);
+            }
         }
     }
-    if (n > 1) {
+
+    if (n > 1)
         factors.push_back(n);
-    }
 
     for (const auto& factor : factors) {
         std::cout << factor << ' ';

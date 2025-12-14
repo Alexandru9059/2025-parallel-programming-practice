@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <iomanip>
-
+#include <thread>
 
 std::vector<std::vector<double>> read_matrix() {
     size_t rows, cols;
@@ -43,32 +43,55 @@ std::vector<std::vector<double>> read_matrix() {
     return result;
 }
 
+std::vector<std::vector<double> > Left;
+std::vector<std::vector<double> > Right;
+std::vector<std::vector<double> > answer;
+
+int left_rows, left_cols, right_cols;
+
+void Worker (int startRow, int endRow) {
+    for (int i = startRow; i < endRow; ++ i ) {
+        for (int j = 0; j < left_cols; ++ j ) {
+            for (int k = 0; k < right_cols; ++ k ) {
+                answer[i][k] += Left[i][j] * Right[j][k];
+            }
+        }
+    }
+}
 
 int main() {
-    auto left = read_matrix();
-    auto right = read_matrix();
-    auto left_rows = left.size();
-    auto left_cols = left[0].size();
-    auto right_cols = right[0].size();
+    Left = read_matrix();
+    Right = read_matrix();
+    left_rows = Left.size();
+    left_cols = Left[0].size();
+    right_cols = Right[0].size();
 
-    if (left.empty() || right.empty() || left[0].size() != right.size()) {
+    if (Left.empty() || Right.empty() || Left[0].size() != Right.size()) {
         std::cerr << "Wrong matrices";
         return 1;
     }
 
-    std::vector<std::vector<double>> result(left_rows, std::vector<double>(right_cols));
-    for (int i = 0; i < left_rows; ++i) {
-        for (int j = 0; j < right_cols; ++j) {
-            for (int k = 0; k < left_cols; ++k) {
-                result[i][j] += left[i][k] * right[k][j];
-            }
-        }
+    answer.resize(left_rows);
+    for (int i = 0; i < left_rows; ++ i )
+        answer[i].resize(right_cols, 0);
+
+    int num_threads = 24;
+    std::vector <std::thread> threads;
+    int cnt_rows = (left_rows + num_threads - 1) / num_threads;
+    int start = 0;
+
+    for (int i = 0; i < num_threads; ++ i ) {
+        threads.push_back(std::thread(Worker, start, std::min(left_rows, start + cnt_rows)));
+        start += cnt_rows;
     }
+
+    for (auto &t : threads)
+        t.join();
 
     std::cout << left_rows << ' ' << right_cols << "\n";
     for (int i = 0; i < left_rows; ++i) {
         for (int j = 0; j < right_cols; ++j) {
-            std::cout << std::setprecision(12) << result[i][j] << ' ';
+            std::cout << std::setprecision(12) << answer[i][j] << ' ';
         }
         std::cout << "\n";
     }
